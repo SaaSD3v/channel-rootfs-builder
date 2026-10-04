@@ -83,28 +83,46 @@ jobs:
         run: |
           set -euxo pipefail
 
+          artifact_for_run() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$1/artifacts" \
+              --jq '.artifacts[] | select(.expired == false and (.name | startswith("channel-mainline-kernel-"))) | .id' \
+              | head -n1
+          }
+
+          RUN_ID=""
           if [ -n "$REQUESTED_RUN_ID" ]; then
-            RUN_ID="$REQUESTED_RUN_ID"
-            CONCLUSION="$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+            CONCLUSION="$(gh run view "$REQUESTED_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
             test "$CONCLUSION" = success
+            ARTIFACT_ID="$(artifact_for_run "$REQUESTED_RUN_ID")"
+            if [ -z "$ARTIFACT_ID" ]; then
+              echo "Requested kernel run $REQUESTED_RUN_ID has no live channel-mainline-kernel artifact." >&2
+              exit 1
+            fi
+            RUN_ID="$REQUESTED_RUN_ID"
           else
-            RUN_ID="$(gh run list \
+            while IFS= read -r CANDIDATE; do
+              [ -n "$CANDIDATE" ] || continue
+              if [ -n "$(artifact_for_run "$CANDIDATE")" ]; then
+                RUN_ID="$CANDIDATE"
+                break
+              fi
+            done < <(gh run list \
               --repo "$GITHUB_REPOSITORY" \
               --workflow build-mainline.yml \
               --branch main \
               --status success \
-              --limit 1 \
+              --limit 10 \
               --json databaseId \
-              --jq '.[0].databaseId' 2>/dev/null || true)"
+              --jq '.[].databaseId')
           fi
 
-          if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
+          if [ -n "$RUN_ID" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-            echo "Using reusable kernel from run $RUN_ID"
+            echo "Using reusable kernel artifact from run $RUN_ID"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No reusable kernel checkpoint exists; building a temporary kernel for this rootfs run."
+            echo "No live reusable kernel artifact exists; building a temporary kernel for this rootfs run."
           fi
 
       - name: Download reusable kernel checkpoint
