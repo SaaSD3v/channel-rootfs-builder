@@ -20,3 +20,16 @@ Flashing a distro with `fastboot flash userdata <rootfs.ext4>` replaces the file
 inside `userdata` but does not recreate the GPT entry, so the partition PARTUUID stays
 the boot locator. The ext4 UUID and distro label belong to the filesystem itself and are
 kept separate from the GPT PARTUUID.
+
+## Kernel reuse and rootfs fallback
+
+`build-mainline.yml` is the only workflow that publishes the reusable kernel checkpoint.
+Debian, Ubuntu, and Alpine first look for a successful `build-mainline.yml` run with a
+live `channel-mainline-kernel-*` artifact. If none exists, the selected rootfs workflow
+builds `SaaSD3v/linux:msm8953/latest` locally with the same `mainline/build.sh` and
+configuration, uses those modules/config/System.map for that rootfs, and does not upload
+the temporary kernel.
+
+The distro workflow files are mirrored on the default branch only so GitHub exposes their
+manual **Run workflow** controls. Their SSH inputs belong to the rootfs workflows; the
+`Build mainline kernel` workflow itself has no SSH inputs and builds no userspace.
