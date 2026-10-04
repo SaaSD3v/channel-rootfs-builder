@@ -15,8 +15,7 @@ env:
   KERNEL_REF: msm8953/latest
   MKBOOTIMG_URL: https://android.googlesource.com/platform/system/tools/mkbootimg
   MKBOOTIMG_REF: d3b6ee4295e1491432ce3d0fcfd53631177bbef4
-  BUSYBOX_VERSION: "1.38.0"
-  CHANNEL_ROOT_UUID: 89530000-6320-4000-8000-000000000001
+  CHANNEL_ROOT_PARTUUID: 76dbdefa-f243-cd22-5da5-9374e6ad318b
 
 jobs:
   kernel:
@@ -31,7 +30,6 @@ jobs:
         run: |
           set -eux
           bash -n mainline/build.sh
-          bash -n mainline/build-initramfs.sh
           bash -n mainline/build-bootimg.sh
 
       - name: Install kernel dependencies
@@ -42,7 +40,7 @@ jobs:
             git ca-certificates curl make bc bison flex \
             gcc-aarch64-linux-gnu libc6-dev-arm64-cross libc6-arm64-cross linux-libc-dev-arm64-cross \
             device-tree-compiler libssl-dev libelf-dev dwarves \
-            python3 cpio gzip bzip2 xz-utils zstd file
+            python3 gzip zstd file
 
       - name: Resolve kernel source
         id: source
@@ -83,45 +81,6 @@ jobs:
           compgen -G 'out/kernel-modules-*.tar.zst' >/dev/null
           test "$(fdtget -t s out/sdm632-motorola-channel.dtb /soc@0/remoteproc@a204000/iris compatible)" = "qcom,wcn3620"
 
-      - name: Build static ARM64 BusyBox
-        run: |
-          set -euxo pipefail
-          cd /tmp
-          curl -fsSLO --retry 3 "https://busybox.net/downloads/busybox-$BUSYBOX_VERSION.tar.bz2"
-          curl -fsSLO --retry 3 "https://busybox.net/downloads/busybox-$BUSYBOX_VERSION.tar.bz2.sha256"
-          sha256sum -c "busybox-$BUSYBOX_VERSION.tar.bz2.sha256"
-          tar -xjf "busybox-$BUSYBOX_VERSION.tar.bz2"
-          cd "busybox-$BUSYBOX_VERSION"
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
-          sed -i 's/^# CONFIG_STATIC is not set$/CONFIG_STATIC=y/' .config
-          set +o pipefail
-          yes '' | make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- oldconfig >/dev/null
-          RC=${PIPESTATUS[1]}
-          set -o pipefail
-          test "$RC" -eq 0
-          grep -qx 'CONFIG_STATIC=y' .config
-          grep -qx 'CONFIG_BLKID=y' .config
-          grep -qx 'CONFIG_MDEV=y' .config
-          grep -qx 'CONFIG_SWITCH_ROOT=y' .config
-          make -j"$(nproc)" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
-          file busybox | grep -Eq 'ARM aarch64|ARM64'
-          file busybox | grep -qi 'statically linked'
-          cp busybox "$GITHUB_WORKSPACE/out/busybox-aarch64-static"
-
-      - name: Build fixed-UUID initramfs
-        env:
-          BUSYBOX_BIN: ${{ github.workspace }}/out/busybox-aarch64-static
-          OUT_DIR: ${{ github.workspace }}/out
-          WORK_DIR: ${{ github.workspace }}/.initramfs-work
-          CHANNEL_ROOT_UUID: ${{ env.CHANNEL_ROOT_UUID }}
-        run: |
-          set -euxo pipefail
-          chmod +x mainline/build-initramfs.sh
-          mainline/build-initramfs.sh
-          test -s out/initramfs-channel.cpio.gz
-          grep -Fqx "rootfs_uuid=$CHANNEL_ROOT_UUID" out/initramfs-report.txt
-          grep -Fqx "root_locator=fixed-filesystem-uuid" out/initramfs-report.txt
-
       - name: Prepare AOSP mkbootimg
         run: |
           set -euxo pipefail
@@ -134,33 +93,36 @@ jobs:
           python3 aosp-mkbootimg/mkbootimg.py --help >/dev/null
           python3 aosp-mkbootimg/unpack_bootimg.py --help >/dev/null
 
-      - name: Build boot image
+      - name: Build direct-root boot image
         env:
           KERNEL_RELEASE: ${{ env.KERNEL_RELEASE }}
           OUT_DIR: ${{ github.workspace }}/out
           KERNEL_IMAGE: ${{ github.workspace }}/out/Image.gz
           CHANNEL_DTB: ${{ github.workspace }}/out/sdm632-motorola-channel.dtb
-          INITRAMFS_IMAGE: ${{ github.workspace }}/out/initramfs-channel.cpio.gz
+          CHANNEL_ROOT_PARTUUID: ${{ env.CHANNEL_ROOT_PARTUUID }}
           MKBOOTIMG_PY: ${{ github.workspace }}/aosp-mkbootimg/mkbootimg.py
         run: |
           set -euxo pipefail
           chmod +x mainline/build-bootimg.sh
           mainline/build-bootimg.sh
           test -s out/boot-channel.img
-          grep -q 'rdinit=/init' out/kernel-cmdline.txt
+          grep -Fq "root=PARTUUID=$CHANNEL_ROOT_PARTUUID" out/kernel-cmdline.txt
+          grep -Fq 'rootfstype=ext4' out/kernel-cmdline.txt
+          grep -Fq 'rootwait' out/kernel-cmdline.txt
+          ! grep -Fq 'rdinit=/init' out/kernel-cmdline.txt
 
           rm -rf /tmp/unpacked-boot
           python3 aosp-mkbootimg/unpack_bootimg.py --boot_img out/boot-channel.img --out /tmp/unpacked-boot
           test -s /tmp/unpacked-boot/kernel
-          test -s /tmp/unpacked-boot/ramdisk
-          gzip -t /tmp/unpacked-boot/ramdisk
+          test ! -s /tmp/unpacked-boot/ramdisk
+
+          echo "root_partuuid=$CHANNEL_ROOT_PARTUUID" >> out/kernel-info.txt
 
       - name: Finalize kernel checkpoint
         run: |
           set -euxo pipefail
           sha256sum \
             out/boot-channel.img \
-            out/initramfs-channel.cpio.gz \
             out/Image.gz \
             out/Image.gz-dtb \
             out/sdm632-motorola-channel.dtb \
@@ -176,8 +138,6 @@ jobs:
           name: channel-mainline-kernel-${{ steps.source.outputs.source_sha }}
           path: |
             out/boot-channel.img
-            out/initramfs-channel.cpio.gz
-            out/initramfs-report.txt
             out/kernel-cmdline.txt
             out/Image.gz
             out/Image.gz-*
