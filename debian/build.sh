@@ -236,9 +236,9 @@ sudo mount -t sysfs sysfs "$ROOTFS/sys"
 sudo install -d -m 0755 "$ROOTFS/run/sshd"
 sudo chroot "$ROOTFS" /usr/sbin/sshd -t
 
-test -e "$ROOTFS/etc/systemd/system/multi-user.target.wants/NetworkManager.service" || \
-  test -e "$ROOTFS/etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service"
-test -e "$ROOTFS/etc/systemd/system/multi-user.target.wants/ssh.service"
+test -L "$ROOTFS/etc/systemd/system/multi-user.target.wants/NetworkManager.service" || \
+  test -L "$ROOTFS/etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service"
+test -L "$ROOTFS/etc/systemd/system/multi-user.target.wants/ssh.service"
 
 cleanup_mounts
 trap - EXIT
