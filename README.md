@@ -24,12 +24,23 @@ kept separate from the GPT PARTUUID.
 ## Kernel reuse and rootfs fallback
 
 `build-mainline.yml` is the only workflow that publishes the reusable kernel checkpoint.
-Debian, Ubuntu, and Alpine first look for a successful `build-mainline.yml` run with a
-live `channel-mainline-kernel-*` artifact. If none exists, the selected rootfs workflow
-builds `SaaSD3v/linux:msm8953/latest` locally with the same `mainline/build.sh` and
-configuration, uses those modules/config/System.map for that rootfs, and does not upload
-the temporary kernel.
+By default, Debian, Ubuntu, and Alpine compile the current
+`SaaSD3v/linux:msm8953/latest` for each rootfs build. The temporary kernel is
+used for matching modules, config and System.map and is not uploaded.
+
+Select `reuse_kernel` explicitly to use a previously published, still-live
+`channel-mainline-kernel-*` artifact. You may provide `kernel_run_id` only
+when reuse is enabled; leaving it empty uses the latest successful artifact.
+If none is available, the workflow builds the kernel locally. Reusing an older
+artifact is an intentional opt-in; the reused kernel commit is shown in the logs.
 
 The distro workflow files are mirrored on the default branch only so GitHub exposes their
 manual **Run workflow** controls. Their SSH inputs belong to the rootfs workflows; the
 `Build mainline kernel` workflow itself has no SSH inputs and builds no userspace.
+
+## Manual GitHub Actions interface
+
+- Choose `Build Debian/Ubuntu/Alpine rootfs (USB open root)` for direct root SSH over USB with **no key/password fields**. The only option is `reuse_kernel`, disabled by default.
+- Choose the regular `Build ... rootfs` workflow for key/password modes. The `ssh_public_key` input is only applicable to `public-key-input` and `public-key-input+password-secret`. Nonempty keys in other modes are rejected.
+- The native GitHub `workflow_dispatch` form cannot hide inputs dynamically. We use separate USB workflows to avoid showing unused fields; rootfs workflows are reusable with `workflow_call`.
+- The default `main` branch exposes launchers. The actual build scripts and overlays are checked out from the corresponding distribution branch.
