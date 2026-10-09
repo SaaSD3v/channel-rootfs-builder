@@ -235,6 +235,8 @@ jobs:
           echo "Temporary kernel built for this run only; it will not be uploaded."
 
       - name: Validate selected kernel checkpoint
+        env:
+          REUSE_KERNEL: ${{ inputs.reuse_kernel }}
         run: |
           set -euxo pipefail
           KERNEL_DIR="$KERNEL_CHECKPOINT_DIR"
