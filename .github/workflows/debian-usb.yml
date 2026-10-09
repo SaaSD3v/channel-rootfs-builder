@@ -1,0 +1,22 @@
+name: Build Debian rootfs (USB open root)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reuse_kernel:
+        description: Reuse latest kernel artifact instead of compiling current source
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  rootfs:
+    uses: ./.github/workflows/debian.yml
+    with:
+      ssh_auth: open-root-usb
+      reuse_kernel: ${{ inputs.reuse_kernel }}
+    secrets: inherit
