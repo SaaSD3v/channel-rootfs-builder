@@ -1,62 +1,45 @@
-# Channel RootFS Builder — Ubuntu
+# Ubuntu Rootfs — Channel
 
-Rootfs **Ubuntu 26.04.1 / systemd** para o Motorola Moto G7 Play (`channel`). Este README descreve **somente a branch `ubuntu`**, não o kernel independente nem outras distribuições.
+Ubuntu Base ARM64 for the Motorola Moto G7 Play.
 
-## Build e arquivos desta branch
+## Build
 
-- Kernel: `SaaSD3v/linux`, branch `msm8953/latest`, arquitetura `arm64`.
-- Script: `ubuntu/build.sh`.
-- Workflow: `.github/workflows/ubuntu.yml` (também acessível pelo lançador na `main`).
-- Artefato de rootfs: `channel-ubuntu-rootfs`.
-- Imagem: `ubuntu-channel-rootfs.ext4.zst` (ext4 raw comprimido).
-- Label ext4: `ubuntu`.
-- UUID ext4: `89530000-6320-4000-8000-000000000001`.
-- O boot do Channel é direto, sem initramfs. Não confunda o UUID ext4 com o PARTUUID da partição Android `userdata`.
+The `ubuntu` branch contains `ubuntu/build.sh` and `.github/workflows/ubuntu.yml`.
 
-O workflow pode reutilizar um checkpoint do kernel ou compilar temporariamente um kernel para instalar módulos compatíveis. O rootfs não substitui os artefatos de boot.
+The workflow installs matching mainline kernel modules. Artifact: `channel-ubuntu-rootfs`.
 
----
+## Image
 
-## Preparar a imagem: ext4 raw ou Android sparse
+Output: `ubuntu-channel-rootfs.ext4.zst` (raw ext4, compressed with zstd). Extract it on the host:
 
-Depois de extrair o ZIP do artefato do GitHub Actions, execute **no computador**:
-
-~~~sh
+```sh
 zstd -d -k ubuntu-channel-rootfs.ext4.zst
-file ubuntu-channel-rootfs.ext4
-~~~
+```
 
-Se `file` identificar **ext4 raw**, pode transformar a imagem em **Android sparse** antes de gravar:
+Keep using your established Channel boot setup. This build does not deploy or flash the image.
 
-~~~sh
-img2simg ubuntu-channel-rootfs.ext4 ubuntu-sparse.img
-fastboot flash userdata ubuntu-sparse.img
-~~~
+After boot, `df -h /` shows the available space. To grow ext4 into unused space on the existing root partition, first verify its device using `findmnt -n -o SOURCE,FSTYPE /`. Use `resize2fs` only with that confirmed ext4 partition.
 
-Se `file` indicar que a imagem **já é Android sparse**, **não** rode `img2simg`: grave o arquivo existente com `fastboot flash userdata ubuntu-channel-rootfs.ext4`. Alguns fastboots também aceitam ext4 raw diretamente: `fastboot flash userdata ubuntu-channel-rootfs.ext4`.
+## Network
 
-Para converter sparse em raw quando necessário: `simg2img ubuntu-sparse.img ubuntu-extraido.ext4`. No computador Debian/Ubuntu, `img2simg` e `simg2img` costumam estar no pacote `android-sdk-libsparse-utils`.
+Connect over the USB gadget:
 
-**Gravar `userdata` destrói seu conteúdo anterior.** Verifique a partição e faça backup. Sparse não muda o tamanho do filesystem.
+```sh
+ssh root@172.16.42.1
+```
 
----
+For Wi-Fi, use NetworkManager on the device:
 
-## Expandir o `/` ext4 para o tamanho da partição
+```sh
+nmcli device wifi list
+nmcli --ask device wifi connect "SSID" ifname wlan0
+```
 
-Depois de iniciar o **telefone**, como root, descubra onde `/` está montado:
+## Time
 
-~~~sh
-findmnt -n -o SOURCE,FSTYPE /
-lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS
-df -h /
-~~~
+If the clock is incorrect, set the actual UTC time manually:
 
-**Apenas para `/` montado em ext4 e depois de confirmar a partição real**, substitua o caminho abaixo pelo dispositivo correto:
-
-~~~sh
-resize2fs /dev/PARTICAO_ROOT_CONFIRMADA
-df -h /
-~~~
-
-Sem tamanho explícito, `resize2fs` pode aumentar o ext4 até o tamanho da partição, se o kernel suportar expansão online. **Não execute `e2fsck` em `/` montado.** Se faltar a ferramenta ou a operação online não funcionar, use um ambiente de recuperação com o ext4 desmontado e backup. O comando não redimensiona a partição GPT.
-
+```sh
+date -u -s "YYYY-MM-DD HH:MM:SS"
+date
+```
