@@ -40,6 +40,26 @@ date -u -s "YYYY-MM-DD HH:MM:SS"
 date
 ```
 
+## Optional Android sparse tools
+
+The rootfs image is raw ext4. Conversion is optional and does not change the existing boot or deployment process.
+
+Install on the Linux system handling the image:
+
+| Distribution | Package command |
+| --- | --- |
+| Debian / Ubuntu | `sudo apt install android-sdk-libsparse-utils` |
+| Alpine (community) | `apk add android-tools-img2simg android-tools-simg2img` |
+
+After decompressing the matching `.ext4.zst` file, for example:
+
+```sh
+img2simg debian-channel-rootfs.ext4 rootfs-sparse.img
+simg2img rootfs-sparse.img rootfs-restored.ext4
+```
+
+`img2simg` converts raw to sparse; `simg2img` converts sparse to raw. Do not convert an image that is already sparse.
+
 ## Rootfs details
 
 | Distribution | Artifact | Image | Label |
