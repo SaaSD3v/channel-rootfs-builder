@@ -16,18 +16,6 @@ Each distribution publishes its own compressed ext4 image: `debian-channel-rootf
 
 The kernel boots directly from the configured root partition. Keep the kernel modules paired with that build.
 
-## Image
-
-Output: `debian-channel-rootfs.ext4.zst` (raw ext4, compressed with zstd). Extract it on the host:
-
-```sh
-zstd -d -k debian-channel-rootfs.ext4.zst
-```
-
-Keep using your established Channel boot setup. This build does not deploy or flash the image.
-
-After boot, `df -h /` shows the available space. To grow ext4 into unused space on the existing root partition, first verify its device using `findmnt -n -o SOURCE,FSTYPE /`. Use `resize2fs` only with that confirmed ext4 partition.
-
 ## Network
 
 Connect over the USB gadget:
@@ -51,3 +39,14 @@ If the clock is incorrect, set the actual UTC time manually:
 date -u -s "YYYY-MM-DD HH:MM:SS"
 date
 ```
+
+## Rootfs details
+
+| Distribution | Artifact | Image | Label |
+| --- | --- | --- | --- |
+| Debian | `channel-debian-rootfs` | `debian-channel-rootfs.ext4.zst` | `debian` |
+| Ubuntu | `channel-ubuntu-rootfs` | `ubuntu-channel-rootfs.ext4.zst` | `ubuntu` |
+| Alpine | `channel-alpine-rootfs` | `alpine-channel-rootfs.ext4.zst` | `alpine` |
+
+- Format: ext4 (raw, zstd-compressed)
+- Ext4 UUID: `89530000-6320-4000-8000-000000000001`
