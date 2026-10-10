@@ -40,25 +40,26 @@ date -u -s "YYYY-MM-DD HH:MM:SS"
 date
 ```
 
-## Optional Android sparse tools
+## Expand the root filesystem
 
-The rootfs image is raw ext4. Conversion is optional and does not change the existing boot or deployment process.
-
-Install on the Linux system handling the image:
-
-| Distribution | Package command |
-| --- | --- |
-| Debian / Ubuntu | `sudo apt install android-sdk-libsparse-utils` |
-| Alpine (community) | `apk add android-tools-img2simg android-tools-simg2img` |
-
-After decompressing the matching `.ext4.zst` file, for example:
+After boot, run as root and identify the ext4 partition mounted at `/`:
 
 ```sh
-img2simg debian-channel-rootfs.ext4 rootfs-sparse.img
-simg2img rootfs-sparse.img rootfs-restored.ext4
+lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS
+grep ' / ' /proc/mounts
+command -v resize2fs
 ```
 
-`img2simg` converts raw to sparse; `simg2img` converts sparse to raw. Do not convert an image that is already sparse.
+If `resize2fs` is unavailable, install `e2fsprogs` on Debian/Ubuntu or `e2fsprogs-extra` on Alpine.
+
+Use the **verified root partition** in this command:
+
+```sh
+resize2fs /dev/ROOT_PARTITION
+df -h /
+```
+
+This expands ext4 to the available size of its partition. Never guess the device path.
 
 ## Rootfs details
 
