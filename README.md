@@ -8,18 +8,6 @@ The `alpine` branch contains `alpine/build.sh` and `.github/workflows/alpine.yml
 
 The workflow installs matching mainline kernel modules. Artifact: `channel-alpine-rootfs`.
 
-## Image
-
-Output: `alpine-channel-rootfs.ext4.zst` (raw ext4, compressed with zstd). Extract it on the host:
-
-```sh
-zstd -d -k alpine-channel-rootfs.ext4.zst
-```
-
-Keep using your established Channel boot setup. This build does not deploy or flash the image.
-
-After boot, `df -h /` shows the available space. To grow ext4 into unused space on the existing root partition, first verify its device using `findmnt -n -o SOURCE,FSTYPE /`. Use `resize2fs` only with that confirmed ext4 partition.
-
 ## Network
 
 Connect over the USB gadget:
@@ -43,3 +31,24 @@ If the clock is incorrect, set the actual UTC time manually:
 date -u -s "YYYY-MM-DD HH:MM:SS"
 date
 ```
+
+## Alpine utilities
+
+If `findmnt` is unavailable, use `grep ' / ' /proc/mounts` or `df -h /`.
+
+Optional packages:
+
+```sh
+apk add e2fsprogs-extra          # resize2fs
+apk add android-tools-img2simg  # Android sparse tool (community)
+```
+
+The output is raw ext4; the build does not need sparse conversion.
+
+## Rootfs details
+
+- Artifact: `channel-alpine-rootfs`
+- Image: `alpine-channel-rootfs.ext4.zst`
+- Format: ext4 (raw, zstd-compressed)
+- Label: `alpine`
+- UUID: `89530000-6320-4000-8000-000000000001`
