@@ -32,24 +32,26 @@ date -u -s "YYYY-MM-DD HH:MM:SS"
 date
 ```
 
-## Optional Android sparse tools
+## Expand the root filesystem
 
-The rootfs image is raw ext4. Conversion is optional and does not change the existing boot or deployment process.
-
-Install on Debian:
+After boot, run as root and identify the ext4 partition mounted at `/`:
 
 ```sh
-sudo apt install android-sdk-libsparse-utils
+lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS
+grep ' / ' /proc/mounts
+command -v resize2fs
 ```
 
-After decompressing the matching `.ext4.zst` file, for example:
+If it is missing, run `apt install e2fsprogs`.
+
+Use the **verified root partition** in this command:
 
 ```sh
-img2simg debian-channel-rootfs.ext4 rootfs-sparse.img
-simg2img rootfs-sparse.img rootfs-restored.ext4
+resize2fs /dev/ROOT_PARTITION
+df -h /
 ```
 
-`img2simg` converts raw to sparse; `simg2img` converts sparse to raw. Do not convert an image that is already sparse.
+This expands ext4 to the available size of its partition. Never guess the device path.
 
 ## Rootfs details
 
