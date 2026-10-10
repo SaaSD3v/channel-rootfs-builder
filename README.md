@@ -30,6 +30,7 @@ builds `SaaSD3v/linux:msm8953/latest` locally with the same `mainline/build.sh` 
 configuration, uses those modules/config/System.map for that rootfs, and does not upload
 the temporary kernel.
 
-The distro workflow files are mirrored on the default branch only so GitHub exposes their
-manual **Run workflow** controls. Their SSH inputs belong to the rootfs workflows; the
-`Build mainline kernel` workflow itself has no SSH inputs and builds no userspace.
+The distro workflow files are mirrored on the default branch so GitHub exposes their
+manual **Run workflow** controls. Rootfs builds always use USB SSH (`ssh`),
+without SSH authentication fields or credential artifacts. Kernel-only builds
+remain independent of SSH and userspace.
